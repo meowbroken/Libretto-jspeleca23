@@ -68,7 +68,24 @@ class AuthController extends Controller
         // Clean up expired tokens
         $user->tokens()->where('expires_at', '<', now())->delete();
 
-        // Always create a new token for simplicity and security
+        // Check for existing valid token
+        $validToken = $user->tokens()
+            ->where('expires_at', '>', now())
+            ->latest('created_at')
+            ->first();
+
+        if ($validToken) {
+            // Return the existing token (cannot return plain text, so ask user to login again if lost)
+            return response()->json([
+                'success' => true,
+                'message' => 'Login successful (existing token still valid)',
+                'user'  => $user,
+                'token' => null, // Cannot return plain text token again
+                'note'  => 'Your previous token is still valid. Please use your existing token.'
+            ]);
+        }
+
+        // Create a new token if none is valid
         $tokenResult = $user->createToken('api-token', ['*'], now()->addDay());
         $token = $tokenResult->plainTextToken;
 
